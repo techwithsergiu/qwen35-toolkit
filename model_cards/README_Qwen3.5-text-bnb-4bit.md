@@ -160,6 +160,14 @@ flowchart TD
     style HUB     fill:#f3e8ff,stroke:#9333ea
 ```
 
+## Conversion
+
+Converted using [qwen35-toolkit](https://github.com/techwithsergiu/qwen35-toolkit) —
+a Python toolkit for BNB quantization, visual tower removal, verification and
+HF Hub publishing of Qwen3.5 models.
+
+---
+
 ## Acknowledgements
 
 Based on [Qwen/Qwen3.5-{SIZE}](https://huggingface.co/Qwen/Qwen3.5-{SIZE})
