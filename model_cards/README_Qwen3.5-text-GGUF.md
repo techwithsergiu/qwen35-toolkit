@@ -102,49 +102,79 @@ Track the bug at [llama.cpp issues](https://github.com/ggml-org/llama.cpp/issues
 flowchart TD
     SRC["Qwen/Qwen3.5-{size}<br/>f16 · source"]
 
-    subgraph BRANCH_A ["Branch A — VLM"]
+    subgraph PATH_A ["Path A — BNB text-only  (training target)"]
         BNBVLM["Qwen3.5-{size}-bnb-4bit<br/>BNB NF4 · VLM"]
-    end
-
-    subgraph BRANCH_B ["Branch B — Text-only BNB"]
-        TEXTF16["Qwen3.5-text-{size}<br/>bf16 · text-only"]
         TEXTBNB["Qwen3.5-text-{size}-bnb-4bit<br/>BNB NF4 · text-only"]
-        TEXTF16 -->|"qwen35-strip --mode bnb"| TEXTBNB
+        V1{{"✅ verified"}}
+        V3{{"✅ verified"}}
+        BNBVLM -->|"qwen35-strip --mode bnb"| TEXTBNB
+        BNBVLM -->|"qwen35-verify-qwen35"| V1
+        TEXTBNB -->|"qwen35-verify"| V3
     end
 
-    subgraph BRANCH_C ["Branch C — GGUF"]
+    subgraph PATH_B ["Path B — f16 text-only + GGUF  (inference / merge base)"]
+        TEXTF16["Qwen3.5-text-{size}<br/>bf16 · text-only"]
+        V2{{"✅ verified"}}
         GGUUF16["Qwen3.5-text-{size}.gguf<br/>GGUF f16"]
         Q4["Q4_K_M ✅ main"]
         Q5KM["Q5_K_M very good quality"]
         Q6K["Q6_K excellent quality"]
         Q8["Q8_0 near-lossless"]
+        TEXTF16 -->|"qwen35-verify"| V2
+        TEXTF16 -->|"convert_hf_to_gguf.py"| GGUUF16
         GGUUF16 -->|"llama-quantize"| Q4
         GGUUF16 -->|"llama-quantize"| Q5KM
         GGUUF16 -->|"llama-quantize"| Q6K
         GGUUF16 -->|"llama-quantize"| Q8
     end
 
+    HUB[("HuggingFace Hub")]
+
     SRC -->|"qwen35-convert"| BNBVLM
     SRC -->|"qwen35-strip --mode f16"| TEXTF16
-    TEXTF16 -->|"convert_hf_to_gguf.py"| GGUUF16
-
-    BNBVLM -->|"qwen35-verify-qwen35"| V1{{"✅ verified"}}
-    TEXTF16 -->|"qwen35-verify"| V2{{"✅ verified"}}
-    TEXTBNB -->|"qwen35-verify"| V3{{"✅ verified"}}
-
-    V1 -->|"qwen35-upload"| HUB[("HuggingFace Hub")]
-    V2 -->|"qwen35-upload"| HUB
+    V1 -->|"qwen35-upload"| HUB
     V3 -->|"qwen35-upload"| HUB
-    Q4  -->|"qwen35-upload"| HUB
+    V2 -->|"qwen35-upload"| HUB
+    Q4   -->|"qwen35-upload"| HUB
     Q5KM -->|"qwen35-upload"| HUB
     Q6K  -->|"qwen35-upload"| HUB
-    Q8  -->|"qwen35-upload"| HUB
+    Q8   -->|"qwen35-upload"| HUB
 
     style TEXTBNB fill:#dcfce7,stroke:#16a34a
-    style Q4  fill:#fce7f3,stroke:#db2777
-    style Q5KM fill:#fce7f3,stroke:#db2777
-    style HUB     fill:#f3e8ff,stroke:#9333ea
+    style Q4     fill:#fce7f3,stroke:#db2777
+    style Q5KM   fill:#fce7f3,stroke:#db2777
+    style Q6K    fill:#fce7f3,stroke:#db2777
+    style Q8     fill:#fce7f3,stroke:#db2777
+    style HUB    fill:#f3e8ff,stroke:#9333ea
 ```
+
+## From fine-tuned adapter to GGUF
+
+If you have a LoRA adapter trained with
+[qwen-qlora-train](https://github.com/techwithsergiu/qwen-qlora-train),
+merge it first, then convert to GGUF:
+
+```bash
+# 1. Merge adapter into f16 weights
+qlora-merge \
+  --base  Qwen/Qwen3.5-{SIZE} \
+  --adapter adapters/<run_name> \
+  --output merged/qwen35-text-{SIZE}-sft-f16
+
+# 2. Convert merged model to GGUF  (requires llama.cpp)
+python llama.cpp/convert_hf_to_gguf.py merged/qwen35-text-{SIZE}-sft-f16 \
+    --outtype f16 \
+    --outfile merged/qwen35-text-{SIZE}-sft-F16.gguf
+
+# 3. Quantize
+./llama.cpp/build/bin/llama-quantize \
+    merged/qwen35-text-{SIZE}-sft-F16.gguf \
+    merged/qwen35-text-{SIZE}-sft-Q4_K_M.gguf \
+    Q4_K_M
+```
+
+Full post-training workflow is documented in
+[qwen-qlora-train → Post-merge workflow](https://github.com/techwithsergiu/qwen-qlora-train#post-merge-workflow).
 
 ## Conversion
 

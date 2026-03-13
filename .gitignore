@@ -3,4 +3,4 @@ qwen35_toolkit.egg-info
 venv
 Qwen3.5-*
 diagrams
-readme.txt
+*.txt

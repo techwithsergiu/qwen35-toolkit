@@ -100,15 +100,31 @@ print(response)
 
 ## Fine-tuning
 
-> **TBD** — LoRA training with this model has not been documented yet.
-> The model has been verified for inference (text generation, thinking ON/OFF).
-> The expectation is that standard Unsloth LoRA training applies — this is a
-> text-only BNB 4-bit model architecturally identical to models Unsloth supports —
-> but this has not been tested yet and there is no official Qwen3.5 text-only
-> training guide to reference.
->
-> For VLM (image + text) fine-tuning of the full model, see:
-> [unsloth.ai/docs/models/qwen3.5/fine-tune](https://unsloth.ai/docs/models/qwen3.5/fine-tune)
+This is the **primary training target** for text LoRA fine-tuning.
+
+Training pipeline: **[github.com/techwithsergiu/qwen-qlora-train](https://github.com/techwithsergiu/qwen-qlora-train)**
+
+QLoRA (Unsloth + TRL + PEFT) · rank 16–64 · validated on RTX 3070 8 GB
+
+```bash
+# Quick start — install
+pip install "unsloth[cu124-torch260] @ git+https://github.com/unslothai/unsloth.git"
+pip install git+https://github.com/techwithsergiu/qwen-qlora-train.git
+
+# Train with a ready-made config
+qlora-train configs/qwen35/0.8b.yaml   # or 2b / 4b
+```
+
+After training, test the adapter without merging:
+
+```bash
+qlora-infer \
+  --model   techwithsergiu/Qwen3.5-text-{SIZE}-bnb-4bit \
+  --adapter adapters/<run_name>
+```
+
+For VLM (image + text) fine-tuning of the full model, see:
+[unsloth.ai/docs/models/qwen3.5/fine-tune](https://unsloth.ai/docs/models/qwen3.5/fine-tune)
 
 ## Pipeline diagram
 
@@ -116,48 +132,50 @@ print(response)
 flowchart TD
     SRC["Qwen/Qwen3.5-{size}<br/>f16 · source"]
 
-    subgraph BRANCH_A ["Branch A — VLM"]
+    subgraph PATH_A ["Path A — BNB text-only  (training target)"]
         BNBVLM["Qwen3.5-{size}-bnb-4bit<br/>BNB NF4 · VLM"]
-    end
-
-    subgraph BRANCH_B ["Branch B — Text-only BNB"]
-        TEXTF16["Qwen3.5-text-{size}<br/>bf16 · text-only"]
         TEXTBNB["Qwen3.5-text-{size}-bnb-4bit<br/>BNB NF4 · text-only"]
-        TEXTF16 -->|"qwen35-strip --mode bnb"| TEXTBNB
+        V1{{"✅ verified"}}
+        V3{{"✅ verified"}}
+        BNBVLM -->|"qwen35-strip --mode bnb"| TEXTBNB
+        BNBVLM -->|"qwen35-verify-qwen35"| V1
+        TEXTBNB -->|"qwen35-verify"| V3
     end
 
-    subgraph BRANCH_C ["Branch C — GGUF"]
+    subgraph PATH_B ["Path B — f16 text-only + GGUF  (inference / merge base)"]
+        TEXTF16["Qwen3.5-text-{size}<br/>bf16 · text-only"]
+        V2{{"✅ verified"}}
         GGUUF16["Qwen3.5-text-{size}.gguf<br/>GGUF f16"]
         Q4["Q4_K_M ✅ main"]
         Q5KM["Q5_K_M very good quality"]
         Q6K["Q6_K excellent quality"]
         Q8["Q8_0 near-lossless"]
+        TEXTF16 -->|"qwen35-verify"| V2
+        TEXTF16 -->|"convert_hf_to_gguf.py"| GGUUF16
         GGUUF16 -->|"llama-quantize"| Q4
         GGUUF16 -->|"llama-quantize"| Q5KM
         GGUUF16 -->|"llama-quantize"| Q6K
         GGUUF16 -->|"llama-quantize"| Q8
     end
 
+    HUB[("HuggingFace Hub")]
+
     SRC -->|"qwen35-convert"| BNBVLM
     SRC -->|"qwen35-strip --mode f16"| TEXTF16
-    TEXTF16 -->|"convert_hf_to_gguf.py"| GGUUF16
-
-    BNBVLM -->|"qwen35-verify-qwen35"| V1{{"✅ verified"}}
-    TEXTF16 -->|"qwen35-verify"| V2{{"✅ verified"}}
-    TEXTBNB -->|"qwen35-verify"| V3{{"✅ verified"}}
-
-    V1 -->|"qwen35-upload"| HUB[("HuggingFace Hub")]
-    V2 -->|"qwen35-upload"| HUB
+    V1 -->|"qwen35-upload"| HUB
     V3 -->|"qwen35-upload"| HUB
-    Q4  -->|"qwen35-upload"| HUB
+    V2 -->|"qwen35-upload"| HUB
+    Q4   -->|"qwen35-upload"| HUB
     Q5KM -->|"qwen35-upload"| HUB
     Q6K  -->|"qwen35-upload"| HUB
-    Q8  -->|"qwen35-upload"| HUB
+    Q8   -->|"qwen35-upload"| HUB
 
     style TEXTBNB fill:#dcfce7,stroke:#16a34a
-    style Q4  fill:#fce7f3,stroke:#db2777
-    style Q5KM fill:#fce7f3,stroke:#db2777
-    style HUB     fill:#f3e8ff,stroke:#9333ea
+    style Q4     fill:#fce7f3,stroke:#db2777
+    style Q5KM   fill:#fce7f3,stroke:#db2777
+    style Q6K    fill:#fce7f3,stroke:#db2777
+    style Q8     fill:#fce7f3,stroke:#db2777
+    style HUB    fill:#f3e8ff,stroke:#9333ea
 ```
 
 ## Conversion

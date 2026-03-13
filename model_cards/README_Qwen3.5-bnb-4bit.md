@@ -54,7 +54,13 @@ BNB-quantized models are roughly 40% of the original f16 size (exact ratio varie
 
 ## Fine-tuning
 
-For VLM (image + text) fine-tuning with Unsloth, refer to the official guide:
+**Text-only LoRA fine-tuning** — use the text-only BNB variant as training base:
+[techwithsergiu/Qwen3.5-text-{SIZE}-bnb-4bit](https://huggingface.co/techwithsergiu/Qwen3.5-text-{SIZE}-bnb-4bit)
+
+Training pipeline (QLoRA · Unsloth · TRL):
+[github.com/techwithsergiu/qwen-qlora-train](https://github.com/techwithsergiu/qwen-qlora-train)
+
+**VLM (image + text) fine-tuning** — refer to the official Unsloth guide:
 [unsloth.ai/docs/models/qwen3.5/fine-tune](https://unsloth.ai/docs/models/qwen3.5/fine-tune)
 
 ## Pipeline diagram
@@ -63,48 +69,50 @@ For VLM (image + text) fine-tuning with Unsloth, refer to the official guide:
 flowchart TD
     SRC["Qwen/Qwen3.5-{size}<br/>f16 · source"]
 
-    subgraph BRANCH_A ["Branch A — VLM"]
+    subgraph PATH_A ["Path A — BNB text-only  (training target)"]
         BNBVLM["Qwen3.5-{size}-bnb-4bit<br/>BNB NF4 · VLM"]
-    end
-
-    subgraph BRANCH_B ["Branch B — Text-only BNB"]
-        TEXTF16["Qwen3.5-text-{size}<br/>bf16 · text-only"]
         TEXTBNB["Qwen3.5-text-{size}-bnb-4bit<br/>BNB NF4 · text-only"]
-        TEXTF16 -->|"qwen35-strip --mode bnb"| TEXTBNB
+        V1{{"✅ verified"}}
+        V3{{"✅ verified"}}
+        BNBVLM -->|"qwen35-strip --mode bnb"| TEXTBNB
+        BNBVLM -->|"qwen35-verify-qwen35"| V1
+        TEXTBNB -->|"qwen35-verify"| V3
     end
 
-    subgraph BRANCH_C ["Branch C — GGUF"]
+    subgraph PATH_B ["Path B — f16 text-only + GGUF  (inference / merge base)"]
+        TEXTF16["Qwen3.5-text-{size}<br/>bf16 · text-only"]
+        V2{{"✅ verified"}}
         GGUUF16["Qwen3.5-text-{size}.gguf<br/>GGUF f16"]
         Q4["Q4_K_M ✅ main"]
         Q5KM["Q5_K_M very good quality"]
         Q6K["Q6_K excellent quality"]
         Q8["Q8_0 near-lossless"]
+        TEXTF16 -->|"qwen35-verify"| V2
+        TEXTF16 -->|"convert_hf_to_gguf.py"| GGUUF16
         GGUUF16 -->|"llama-quantize"| Q4
         GGUUF16 -->|"llama-quantize"| Q5KM
         GGUUF16 -->|"llama-quantize"| Q6K
         GGUUF16 -->|"llama-quantize"| Q8
     end
 
+    HUB[("HuggingFace Hub")]
+
     SRC -->|"qwen35-convert"| BNBVLM
     SRC -->|"qwen35-strip --mode f16"| TEXTF16
-    TEXTF16 -->|"convert_hf_to_gguf.py"| GGUUF16
-
-    BNBVLM -->|"qwen35-verify-qwen35"| V1{{"✅ verified"}}
-    TEXTF16 -->|"qwen35-verify"| V2{{"✅ verified"}}
-    TEXTBNB -->|"qwen35-verify"| V3{{"✅ verified"}}
-
-    V1 -->|"qwen35-upload"| HUB[("HuggingFace Hub")]
-    V2 -->|"qwen35-upload"| HUB
+    V1 -->|"qwen35-upload"| HUB
     V3 -->|"qwen35-upload"| HUB
-    Q4  -->|"qwen35-upload"| HUB
+    V2 -->|"qwen35-upload"| HUB
+    Q4   -->|"qwen35-upload"| HUB
     Q5KM -->|"qwen35-upload"| HUB
     Q6K  -->|"qwen35-upload"| HUB
-    Q8  -->|"qwen35-upload"| HUB
+    Q8   -->|"qwen35-upload"| HUB
 
     style TEXTBNB fill:#dcfce7,stroke:#16a34a
-    style Q4  fill:#fce7f3,stroke:#db2777
-    style Q5KM fill:#fce7f3,stroke:#db2777
-    style HUB     fill:#f3e8ff,stroke:#9333ea
+    style Q4     fill:#fce7f3,stroke:#db2777
+    style Q5KM   fill:#fce7f3,stroke:#db2777
+    style Q6K    fill:#fce7f3,stroke:#db2777
+    style Q8     fill:#fce7f3,stroke:#db2777
+    style HUB    fill:#f3e8ff,stroke:#9333ea
 ```
 
 ## Conversion
