@@ -1,0 +1,3 @@
+exclude:
+  - model_cards/
+  - "**/README*.md"
