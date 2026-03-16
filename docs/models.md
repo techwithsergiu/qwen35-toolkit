@@ -1,0 +1,61 @@
+---
+title: Published models
+---
+
+# Published models
+
+## Collections on HuggingFace Hub
+
+| Collection | Description | Models |
+|---|---|---|
+| [Qwen3.5 BNB 4-bit](https://huggingface.co/collections/techwithsergiu/qwen35-bnb-4bit) | VLM, BNB NF4 quantized | 0.8B · 2B · 4B · 9B |
+| [Qwen3.5 Text](https://huggingface.co/collections/techwithsergiu/qwen35-text) | Text-only bf16 | 0.8B · 2B · 4B · 9B |
+| [Qwen3.5 Text BNB 4-bit](https://huggingface.co/collections/techwithsergiu/qwen35-text-bnb-4bit) | Text-only, BNB NF4 | 0.8B · 2B · 4B · 9B |
+| [Qwen3.5 Text GGUF](https://huggingface.co/collections/techwithsergiu/qwen35-text-gguf) | Text-only, GGUF Q4–F16 | 0.8B · 2B · 4B · 9B |
+
+---
+
+## Model lineage
+
+Four model families produced from the original Qwen3.5 f16.
+Arrows show the `base_model` relationship declared in each HF repo.
+
+```mermaid
+graph LR
+    SRC["Qwen/Qwen3.5-{size}<br/>f16 · VLM"]
+    BNBVLM["Qwen3.5-{size}-bnb-4bit<br/>BNB NF4 · VLM"]
+    TEXTF16["Qwen3.5-text-{size}<br/>bf16 · text-only"]
+    TEXTBNB["Qwen3.5-text-{size}-bnb-4bit<br/>BNB NF4 · text-only ✅"]
+    GGUF["Qwen3.5-text-{size}-GGUF<br/>Q8_0 · Q6_K · Q5_K_M · Q4_K_M · Q4_K_S"]
+
+    SRC -->|"base_model"| BNBVLM
+    SRC -->|"base_model"| TEXTF16
+    TEXTF16 -->|"base_model"| TEXTBNB
+    TEXTF16 -->|"base_model"| GGUF
+
+    style BNBVLM fill:#fef9c3,stroke:#ca8a04
+    style TEXTBNB fill:#dcfce7,stroke:#16a34a
+    style GGUF    fill:#fce7f3,stroke:#db2777
+```
+
+> **Why GGUF `base_model` points to `Qwen3.5-text-{size}`:**
+> GGUF quants are derived from the text-only f16 model — same weights, different
+> container format. Linking to the f16 text variant keeps the lineage clear and
+> separates GGUF from the VLM branch on the Hub.
+
+---
+
+## HuggingFace README templates
+
+Four template files — one per model family, located in `model_cards/`.
+Replace `{SIZE}` with the model size (`0.8B`, `2B`, `4B`, `9B`).
+
+| File | Model type | `pipeline_tag` | `base_model` |
+|---|---|---|---|
+| `model_cards/README_Qwen3.5-bnb-4bit.md` | BNB 4-bit VLM | `image-text-to-text` | `Qwen/Qwen3.5-{SIZE}` |
+| `model_cards/README_Qwen3.5-text.md` | f16 text-only | `text-generation` | `Qwen/Qwen3.5-{SIZE}` |
+| `model_cards/README_Qwen3.5-text-bnb-4bit.md` | BNB 4-bit text-only | `text-generation` | `techwithsergiu/Qwen3.5-text-{SIZE}` |
+| `model_cards/README_Qwen3.5-text-GGUF.md` | GGUF quants | `text-generation` | `techwithsergiu/Qwen3.5-text-{SIZE}` |
+
+To pre-render Mermaid diagrams in the templates for PDF export, see
+[Tools](tools.md).
