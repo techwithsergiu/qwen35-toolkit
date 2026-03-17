@@ -2,8 +2,19 @@
 title: Commands
 ---
 
-
 # Commands
+
+## Purpose
+
+This page is the command index for the toolkit CLI.
+Use it to find the right command, then open the linked reference page.
+
+## When to use
+
+- You know the task (convert/strip/verify/upload) and need the right command.
+- You need a starting point before reading command-specific details.
+
+## Command map
 
 | CLI command | Module | Purpose | Docs |
 |---|---|---|---|
@@ -16,4 +27,13 @@ title: Commands
 | `qwen35-render-mermaid` | `qwen35_toolkit.tools.render_mermaid` | Pre-render Mermaid diagrams → PNG for PDF export | [Tools](tools.md) |
 | — | — | GGUF conversion + quantization (llama.cpp, external) | [GGUF](gguf.md) |
 
-All commands support `--help` for full usage.
+## Notes
+
+- All commands support `--help` for full usage.
+- `qwen35-convert` is Qwen3.5-specific.
+
+## Related
+
+- [Quickstart](quickstart.md)
+- [Conversion pipeline](conversion-pipeline.md)
+- [Verify](verify.md)
