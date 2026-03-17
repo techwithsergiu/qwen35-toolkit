@@ -1,6 +1,5 @@
 ---
 title: qwen35-strip
-render_with_liquid: false
 ---
 
 
