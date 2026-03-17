@@ -2,100 +2,92 @@
 title: GGUF conversion
 ---
 
-
 # GGUF conversion
 
-Converts a text-only bf16 model to GGUF format using **llama.cpp** (external
-tool, not part of this toolkit). Requires Path B of the pipeline — the source
-must be a `Qwen3_5ForCausalLM` text-only model, not the VLM variant.
+> [!NOTE]
+> Validated path uses text-only Qwen3.5 checkpoints.
+> Do not use VLM checkpoints with visual tower for GGUF conversion.
 
-> **Why text-only:** llama.cpp does not support the Qwen3.5 visual tower.
-> Using the VLM variant will fail or produce incorrect output.
+## Prerequisites
 
-## Setup
+- Text-only model from Path B (for example `Qwen3.5-text-0.8B`).
+- `llama.cpp` cloned locally.
+- Python environment with conversion script dependencies.
+
+## Steps
+
+### Step 1 — Build llama.cpp tools
+Build `llama-quantize` binary for your environment.
 
 ```bash
 git clone https://github.com/ggml-org/llama.cpp
-
-# Build with CUDA support
 cd llama.cpp
 cmake -B build -DLLAMA_CUDA=ON
 cmake --build build --config Release -j$(nproc)
 cd ..
 ```
 
-No build needed for `convert_hf_to_gguf.py` — it is a Python-only script.
+Success criteria: `./llama.cpp/build/bin/llama-quantize --help` runs.
 
-## Step 1 — HF → GGUF f16
+### Step 2 — Convert HF model to GGUF f16
+Convert text-only model directory into f16 GGUF file.
 
 ```bash
 python llama.cpp/convert_hf_to_gguf.py <model_path> \
-    --outtype f16 \
-    --outfile <output_dir>/<name>-F16.gguf
+  --outtype f16 \
+  --outfile <output_dir>/<name>-F16.gguf
 ```
 
-Example (0.8B):
+Success criteria: `<name>-F16.gguf` exists in output directory.
 
-```bash
-python llama.cpp/convert_hf_to_gguf.py ./Qwen3.5-text-0.8B \
-    --outtype f16 \
-    --outfile ./Qwen3.5-text-0.8B-GGUF/Qwen3.5-text-0.8B-F16.gguf
-```
-
-## Step 2 — GGUF f16 → quantized
+### Step 3 — Quantize GGUF
+Create quantized variants from f16 GGUF.
 
 ```bash
 ./llama.cpp/build/bin/llama-quantize <input.gguf> <output.gguf> <TYPE>
 ```
 
-### Quant types
+Success criteria: quantized `.gguf` file is produced for selected type.
 
-| Type   | Size vs f16 | Notes |
-|--------|-------------|-------|
-| Q8_0   | ~53%        | Near-lossless — for high-quality inference |
-| Q6_K   | ~41%        | Excellent quality, good balance with f16 |
-| Q5_K_M | ~37%        | Very good quality, smaller than Q6 |
-| Q4_K_M | ~31%        | ✅ Recommended — best size/quality balance |
-| Q4_K_S | ~30%        | Optional — slightly smaller, slightly lower quality |
+## Quantization options
 
-### Examples (0.8B)
+| Type | Size vs f16 | Notes |
+|------|-------------|-------|
+| `Q8_0` | ~53% | Near-lossless quality |
+| `Q6_K` | ~41% | High quality balance |
+| `Q5_K_M` | ~37% | Smaller with strong quality |
+| `Q4_K_M` | ~31% | Recommended default |
+| `Q4_K_S` | ~30% | Slightly smaller, lower quality |
+
+## Example commands (0.8B)
+
+```bash
+python llama.cpp/convert_hf_to_gguf.py ./Qwen3.5-text-0.8B \
+  --outtype f16 \
+  --outfile ./Qwen3.5-text-0.8B-GGUF/Qwen3.5-text-0.8B-F16.gguf
+```
 
 ```bash
 ./llama.cpp/build/bin/llama-quantize \
-    ./Qwen3.5-text-0.8B-GGUF/Qwen3.5-text-0.8B-F16.gguf \
-    ./Qwen3.5-text-0.8B-GGUF/Qwen3.5-text-0.8B-Q8_0.gguf \
-    Q8_0
-
-./llama.cpp/build/bin/llama-quantize \
-    ./Qwen3.5-text-0.8B-GGUF/Qwen3.5-text-0.8B-F16.gguf \
-    ./Qwen3.5-text-0.8B-GGUF/Qwen3.5-text-0.8B-Q6_K.gguf \
-    Q6_K
-
-./llama.cpp/build/bin/llama-quantize \
-    ./Qwen3.5-text-0.8B-GGUF/Qwen3.5-text-0.8B-F16.gguf \
-    ./Qwen3.5-text-0.8B-GGUF/Qwen3.5-text-0.8B-Q5_K_M.gguf \
-    Q5_K_M
-
-./llama.cpp/build/bin/llama-quantize \
-    ./Qwen3.5-text-0.8B-GGUF/Qwen3.5-text-0.8B-F16.gguf \
-    ./Qwen3.5-text-0.8B-GGUF/Qwen3.5-text-0.8B-Q4_K_M.gguf \
-    Q4_K_M
-
-./llama.cpp/build/bin/llama-quantize \
-    ./Qwen3.5-text-0.8B-GGUF/Qwen3.5-text-0.8B-F16.gguf \
-    ./Qwen3.5-text-0.8B-GGUF/Qwen3.5-text-0.8B-Q4_K_S.gguf \
-    Q4_K_S
+  ./Qwen3.5-text-0.8B-GGUF/Qwen3.5-text-0.8B-F16.gguf \
+  ./Qwen3.5-text-0.8B-GGUF/Qwen3.5-text-0.8B-Q4_K_M.gguf \
+  Q4_K_M
 ```
 
-## Running GGUF models with llama.cpp
+## Expected result
 
-The published GGUF models are quantized to Q4_K_M and available at:
-https://huggingface.co/collections/techwithsergiu/qwen35-text-gguf
+- You have one f16 GGUF file.
+- You have one or more quantized GGUF files (commonly `Q4_K_M`).
+- Files are ready for llama.cpp-based inference or Hub upload.
 
-```bash
-./build/bin/llama-cli \
-  --hf-repo <your-hf-username>/Qwen3.5-text-0.8B-GGUF \
-  --hf-file Qwen3.5-text-0.8B-Q4_K_M.gguf \
-  -p "Write a Python function that reverses a string." \
-  -n 512
-```
+## Common failures
+
+- Conversion fails on VLM checkpoint -> use text-only checkpoint first (`qwen35-strip --mode f16`).
+- `llama-quantize` not found -> build llama.cpp binaries first.
+- Unexpected quality/size tradeoff -> regenerate with different quant type.
+
+## Related
+
+- [Quickstart](quickstart.md)
+- [Conversion pipeline](conversion-pipeline.md)
+- [Upload](upload.md)

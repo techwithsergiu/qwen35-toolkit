@@ -33,12 +33,16 @@ fine-tuned result.
 
 ```mermaid
 graph LR
-    A["Qwen/Qwen3.5-{SIZE}<br/>f16 · VLM"] --> B["Qwen3.5-{SIZE}-bnb-4bit<br/>BNB NF4 · VLM"]
-    A --> C["Qwen3.5-text-{SIZE}<br/>bf16 · text-only"]
-    C --> D["Qwen3.5-text-{SIZE}-bnb-4bit<br/>BNB NF4 · text-only"]
-    C --> E["Qwen3.5-text-{SIZE}-GGUF<br/>Q8_0 · Q6_K · Q5_K_M · Q4_K_M · Q4_K_S"]
-    style B fill:#dbeafe,stroke:#3b82f6,color:#1e3a5f
-    style E fill:#fce7f3,stroke:#db2777,color:#831843
+    SRC["Qwen/Qwen3.5-{size}<br/>f16 · VLM"]
+    BNBVLM["Qwen3.5-{size}-bnb-4bit<br/>BNB NF4 · VLM"]
+    TEXTF16["Qwen3.5-text-{size}<br/>bf16 · text-only"]
+    TEXTBNB["Qwen3.5-text-{size}-bnb-4bit<br/>BNB NF4 · text-only"]
+    GGUF["Qwen3.5-text-{size}-GGUF<br/>Q8_0 · Q6_K · Q5_K_M · Q4_K_M · Q4_K_S"]
+
+    SRC -->|"base_model"| BNBVLM
+    SRC -->|"base_model"| TEXTF16
+    TEXTF16 -->|"base_model"| TEXTBNB
+    TEXTF16 -->|"base_model"| GGUF
 ```
 
 | Model | Type | Base model |
@@ -58,7 +62,7 @@ BNB-quantized models are roughly 40% of the original f16 size (exact ratio varie
 [techwithsergiu/Qwen3.5-text-{SIZE}-bnb-4bit](https://huggingface.co/techwithsergiu/Qwen3.5-text-{SIZE}-bnb-4bit)
 
 Training pipeline (QLoRA · Unsloth · TRL):
-[github.com/techwithsergiu/qwen-qlora-train](https://github.com/techwithsergiu/qwen-qlora-train)
+[github.com/techwithsergiu/qwen-qlora-train](https://techwithsergiu.github.io/qwen-qlora-train)
 
 **VLM (image + text) fine-tuning** — refer to the official Unsloth guide:
 [unsloth.ai/docs/models/qwen3.5/fine-tune](https://unsloth.ai/docs/models/qwen3.5/fine-tune)
@@ -72,8 +76,8 @@ flowchart TD
     subgraph PATH_A ["Path A — BNB text-only  (training target)"]
         BNBVLM["Qwen3.5-{size}-bnb-4bit<br/>BNB NF4 · VLM"]
         TEXTBNB["Qwen3.5-text-{size}-bnb-4bit<br/>BNB NF4 · text-only"]
-        V1{{"✅ verified"}}
-        V3{{"✅ verified"}}
+        V1{{"verified"}}
+        V3{{"verified"}}
         BNBVLM -->|"qwen35-strip --mode bnb"| TEXTBNB
         BNBVLM -->|"qwen35-verify-qwen35"| V1
         TEXTBNB -->|"qwen35-verify"| V3
@@ -81,12 +85,12 @@ flowchart TD
 
     subgraph PATH_B ["Path B — f16 text-only + GGUF  (inference / merge base)"]
         TEXTF16["Qwen3.5-text-{size}<br/>bf16 · text-only"]
-        V2{{"✅ verified"}}
+        V2{{"verified"}}
         GGUUF16["Qwen3.5-text-{size}.gguf<br/>GGUF f16"]
-        Q4["Q4_K_M ✅ main"]
-        Q5KM["Q5_K_M very good quality"]
-        Q6K["Q6_K excellent quality"]
-        Q8["Q8_0 near-lossless"]
+        Q4["Q4_K_M"]
+        Q5KM["Q5_K_M"]
+        Q6K["Q6_K"]
+        Q8["Q8_0"]
         TEXTF16 -->|"qwen35-verify"| V2
         TEXTF16 -->|"convert_hf_to_gguf.py"| GGUUF16
         GGUUF16 -->|"llama-quantize"| Q4
@@ -106,18 +110,11 @@ flowchart TD
     Q5KM -->|"qwen35-upload"| HUB
     Q6K  -->|"qwen35-upload"| HUB
     Q8   -->|"qwen35-upload"| HUB
-
-    style TEXTBNB fill:#dcfce7,stroke:#16a34a
-    style Q4     fill:#fce7f3,stroke:#db2777
-    style Q5KM   fill:#fce7f3,stroke:#db2777
-    style Q6K    fill:#fce7f3,stroke:#db2777
-    style Q8     fill:#fce7f3,stroke:#db2777
-    style HUB    fill:#f3e8ff,stroke:#9333ea
 ```
 
 ## Conversion
 
-Converted using [qwen35-toolkit](https://github.com/techwithsergiu/qwen35-toolkit) —
+Converted using [qwen35-toolkit](https://techwithsergiu.github.io/qwen35-toolkit) —
 a Python toolkit for BNB quantization, visual tower removal, verification and
 HF Hub publishing of Qwen3.5 models.
 
